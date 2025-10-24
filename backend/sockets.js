@@ -1,5 +1,7 @@
 import { randomUUID } from 'crypto';
 
+const allowedVotes = new Set(['1', '2', '3', '5', '8', '13']);
+
 const buildOk = (data) => ({ ok: true, data });
 const buildError = (message) => ({ ok: false, error: message });
 
@@ -99,7 +101,17 @@ export default function registerSocketHandlers(io, db, buildRoomState) {
           callback(buildError('Join a room before voting.'));
           return;
         }
-        updateVote.run(vote ?? null, participantId);
+        const normalizedVote =
+          typeof vote === 'number'
+            ? String(vote)
+            : typeof vote === 'string'
+            ? vote.trim()
+            : null;
+        if (!normalizedVote || !allowedVotes.has(normalizedVote)) {
+          callback(buildError('Please choose one of the available numbers.'));
+          return;
+        }
+        updateVote.run(normalizedVote, participantId);
         const roomReveal = getRoomRevealState.get(roomId);
         if (!roomReveal || roomReveal.votesRevealed === 0) {
           setVotesRevealed.run(0, roomId);

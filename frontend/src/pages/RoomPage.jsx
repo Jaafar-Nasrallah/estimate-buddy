@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import useRoomSocket from '../hooks/useRoomSocket.js';
 
-const voteOptions = ['1', '2', '3', '5', '8', '13', 'XS', 'S', 'M', 'L', 'XL'];
+const voteOptions = ['1', '2', '3', '5', '8', '13'];
 
 const storageKey = (roomId) => `estimate-buddy:${roomId}:participant`;
 
@@ -29,6 +29,8 @@ export default function RoomPage() {
   });
   const [nameInput, setNameInput] = useState(participant?.name || '');
   const [selectedVote, setSelectedVote] = useState(null);
+  const [pendingVote, setPendingVote] = useState(null);
+  const [isSubmittingVote, setIsSubmittingVote] = useState(false);
   const [joinError, setJoinError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [isJoining, setIsJoining] = useState(false);
@@ -36,6 +38,7 @@ export default function RoomPage() {
   const [isResetting, setIsResetting] = useState(false);
   const [storyTitle, setStoryTitle] = useState('');
   const [storyDescription, setStoryDescription] = useState('');
+  const [shouldSyncStory, setShouldSyncStory] = useState(true);
   const ownerToken = ownerTokenQuery || participant?.ownerToken || null;
   const shareLink = useMemo(() => {
     if (typeof window === 'undefined') {
@@ -46,10 +49,12 @@ export default function RoomPage() {
 
   useEffect(() => {
     if (state?.room) {
-      setStoryTitle(state.room.title || '');
-      setStoryDescription(state.room.description || '');
+      if (!participant?.isOwner || shouldSyncStory) {
+        setStoryTitle(state.room.title || '');
+        setStoryDescription(state.room.description || '');
+      }
     }
-  }, [state?.room?.title, state?.room?.description]);
+  }, [participant?.isOwner, shouldSyncStory, state?.room?.description, state?.room?.title]);
 
   useEffect(() => {
     if (participant && ownerToken && ownerToken !== participant.ownerToken) {
@@ -74,6 +79,7 @@ export default function RoomPage() {
     const me = state.participants.find((p) => p.id === participant.participantId);
     if (me && !me.hasVoted) {
       setSelectedVote(null);
+      setPendingVote(null);
     }
     if (me && participant && me.name !== participant.name) {
       const next = { ...participant, name: me.name };
@@ -111,17 +117,31 @@ export default function RoomPage() {
     }
   };
 
-  const handleVote = async (vote) => {
+  const handleVoteSelect = (vote) => {
+    setPendingVote((current) => (current === vote ? null : vote));
+    setActionError(null);
+  };
+
+  const handleVoteSubmit = async (event) => {
+    event.preventDefault();
     if (!participant) {
       setActionError('Join the room before voting.');
       return;
     }
+    if (!pendingVote) {
+      setActionError('Pick a number before submitting your vote.');
+      return;
+    }
     setActionError(null);
+    setIsSubmittingVote(true);
     try {
-      await submitVote(vote);
-      setSelectedVote(vote);
+      await submitVote(pendingVote);
+      setSelectedVote(pendingVote);
+      setPendingVote(null);
     } catch (err) {
       setActionError(err.message);
+    } finally {
+      setIsSubmittingVote(false);
     }
   };
 
@@ -148,10 +168,21 @@ export default function RoomPage() {
     setIsResetting(true);
     setActionError(null);
     try {
+      setShouldSyncStory(true);
       await resetVotes({ title: storyTitle, description: storyDescription });
       setSelectedVote(null);
+      setPendingVote(null);
+      if (participant?.isOwner && typeof window !== 'undefined') {
+        const wantsNext = window.confirm('Would you like to size another story now?');
+        if (wantsNext) {
+          setShouldSyncStory(false);
+          setStoryTitle('');
+          setStoryDescription('');
+        }
+      }
     } catch (err) {
       setActionError(err.message);
+      setShouldSyncStory(false);
     } finally {
       setIsResetting(false);
     }
@@ -164,8 +195,10 @@ export default function RoomPage() {
     setIsResetting(true);
     setActionError(null);
     try {
+      setShouldSyncStory(true);
       await resetVotes();
       setSelectedVote(null);
+      setPendingVote(null);
     } catch (err) {
       setActionError(err.message);
     } finally {
@@ -232,13 +265,23 @@ export default function RoomPage() {
               <h3>Update Story</h3>
               <label className="field">
                 <span>Title</span>
-                <input value={storyTitle} onChange={(event) => setStoryTitle(event.target.value)} required />
+                <input
+                  value={storyTitle}
+                  onChange={(event) => {
+                    setShouldSyncStory(false);
+                    setStoryTitle(event.target.value);
+                  }}
+                  required
+                />
               </label>
               <label className="field">
                 <span>Description</span>
                 <textarea
                   value={storyDescription}
-                  onChange={(event) => setStoryDescription(event.target.value)}
+                  onChange={(event) => {
+                    setShouldSyncStory(false);
+                    setStoryDescription(event.target.value);
+                  }}
                   rows={4}
                 />
               </label>
@@ -261,21 +304,26 @@ export default function RoomPage() {
       {participant ? (
         <section className="card voting">
           <h3>Pick your estimate</h3>
-          <div className="vote-grid">
-            {voteOptions.map((option) => {
-              const isActive = selectedVote === option;
-              return (
-                <button
-                  key={option}
-                  type="button"
-                  className={isActive ? 'vote active' : 'vote'}
-                  onClick={() => handleVote(option)}
-                >
-                  {option}
-                </button>
-              );
-            })}
-          </div>
+          <form className="vote-form" onSubmit={handleVoteSubmit}>
+            <div className="vote-grid">
+              {voteOptions.map((option) => {
+                const isActive = pendingVote ? pendingVote === option : selectedVote === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    className={isActive ? 'vote active' : 'vote'}
+                    onClick={() => handleVoteSelect(option)}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
+            <button type="submit" className="primary" disabled={isSubmittingVote || !pendingVote}>
+              {isSubmittingVote ? 'Submitting…' : 'Submit Vote'}
+            </button>
+          </form>
           {actionError ? <p className="error">{actionError}</p> : null}
           {votesRevealed && state?.average ? (
             <p className="average">Average (numeric votes only): {state.average}</p>
