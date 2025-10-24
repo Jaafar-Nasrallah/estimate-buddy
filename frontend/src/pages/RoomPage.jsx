@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import useRoomSocket from '../hooks/useRoomSocket.js';
 
 const voteOptions = ['1', '2', '3', '5', '8', '13'];
@@ -13,6 +13,7 @@ const useOwnerTokenQuery = () => {
 
 export default function RoomPage() {
   const { roomId } = useParams();
+  const navigate = useNavigate();
   const ownerTokenQuery = useOwnerTokenQuery();
   const { state, status, error, joinRoom, submitVote, revealVotes, resetVotes } = useRoomSocket(roomId);
   const [participant, setParticipant] = useState(() => {
@@ -175,6 +176,9 @@ export default function RoomPage() {
       if (participant?.isOwner && typeof window !== 'undefined') {
         const wantsNext = window.confirm('Would you like to size another story now?');
         if (wantsNext) {
+          localStorage.removeItem(storageKey(roomId));
+          navigate('/');
+        } else {
           setShouldSyncStory(false);
           setStoryTitle('');
           setStoryDescription('');
