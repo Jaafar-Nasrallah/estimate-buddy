@@ -62,6 +62,27 @@ npm run dev --prefix frontend
 
 Visit `http://localhost:5173` to use the app.
 
+### Running a production build locally
+
+When you're ready to mimic a production setup on your machine:
+
+1. **Build the frontend**
+   ```bash
+   npm run build --prefix frontend
+   ```
+   This generates static assets in `frontend/dist`.
+2. **Serve the frontend build** using any static file server. For example:
+   ```bash
+   npx serve frontend/dist
+   ```
+   (Replace with your preferred static host such as Nginx, Caddy, or an object store.)
+3. **Start the backend API in production mode**
+   ```bash
+   npm start --prefix backend
+   ```
+   This runs the Express server without hot reloading.
+4. **Point the frontend at the backend** by ensuring `VITE_API_URL` and `VITE_SOCKET_URL` in `.env` match the production addresses before building.
+
 ### Hosting a session
 
 1. Create a room from the landing page and keep the facilitator tab open.
@@ -94,15 +115,23 @@ The following sections walk through end-to-end setup on the most common targets.
    npm install --prefix backend
    npm install --prefix frontend
    ```
-5. **Start the backend**
+5. **Start the backend (development)**
    ```powershell
    npm run dev --prefix backend
    ```
-6. **Start the frontend** (in a second PowerShell window)
+6. **Start the frontend (development)** (in a second PowerShell window)
    ```powershell
    npm run dev --prefix frontend
    ```
 7. **Open the app** at [http://localhost:5173](http://localhost:5173). The backend runs on [http://localhost:4000](http://localhost:4000).
+
+> **Production on Windows:**
+> ```powershell
+> npm run build --prefix frontend
+> npx serve frontend/dist
+> npm start --prefix backend
+> ```
+> Use IIS, Nginx, or any static host in place of `npx serve` for long-running setups.
 
 > **Tip:** For production builds on Windows, run `npm run build --prefix frontend` and serve the contents of `frontend/dist` behind any static web server while pointing it to the running backend.
 
@@ -129,15 +158,23 @@ The following sections walk through end-to-end setup on the most common targets.
    npm install --prefix backend
    npm install --prefix frontend
    ```
-5. **Start the backend**
+5. **Start the backend (development)**
    ```bash
    npm run dev --prefix backend
    ```
-6. **Start the frontend** (new terminal)
+6. **Start the frontend (development)** (new terminal)
    ```bash
    npm run dev --prefix frontend
    ```
 7. **Visit the app** at `http://localhost:5173`.
+
+> **Production on Ubuntu:**
+> ```bash
+> npm run build --prefix frontend
+> npx serve frontend/dist   # or configure Nginx/Apache to serve ./frontend/dist
+> npm start --prefix backend
+> ```
+> Ensure the `.env` values point to your chosen hostnames before building.
 
 ### Docker (local containers)
 
